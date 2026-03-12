@@ -66,6 +66,23 @@ CONF_IRRADIANCE_ENTITY = "irradiance_entity"
 CONF_IRRADIANCE_THRESHOLD = "irradiance_threshold"
 CONF_OUTSIDE_THRESHOLD = "outside_threshold"
 
+# ── Alarm / Security Integration ─────────────────────────────────────────────
+CONF_ALARM_ENTITY = "alarm_entity"
+CONF_ALARM_INHIBIT_STATES = "alarm_inhibit_states"
+
+# All alarm_control_panel states that can be selected for inhibiting
+ALARM_STATES = [
+    "armed_away",
+    "armed_home",
+    "armed_night",
+    "armed_vacation",
+    "armed_custom_bypass",
+    "triggered",
+]
+
+# Default: pause on away & vacation (common "nobody home" modes)
+DEFAULT_ALARM_INHIBIT_STATES: list[str] = ["armed_away", "armed_vacation"]
+# ─────────────────────────────────────────────────────────────────────────────
 
 CONF_DELTA_POSITION = "delta_position"
 CONF_DELTA_TIME = "delta_time"
@@ -189,6 +206,7 @@ class ControlStatus:
     SUN_NOT_VISIBLE = "sun_not_visible"
     FORCE_OVERRIDE_ACTIVE = "force_override_active"
     MOTION_TIMEOUT = "motion_timeout"
+    ALARM_INHIBITED = "alarm_inhibited"  # NEW: paused by alarm system
 
 
 # Geometric accuracy constants (used in calculation.py for safety margins and edge cases)
