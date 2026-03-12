@@ -14,7 +14,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_ENABLE_DIAGNOSTICS, DOMAIN
+from .const import CONF_ALARM_ENTITY, CONF_ENABLE_DIAGNOSTICS, DOMAIN
 from .coordinator import AdaptiveDataUpdateCoordinator
 from .entity_base import AdaptiveCoverBaseEntity
 
@@ -50,6 +50,15 @@ async def async_setup_entry(
         coordinator,
     )
     entities.extend([binary_sensor, manual_override])
+
+    # "Paused by Alarm" sensor — only shown when alarm entity is configured
+    if config_entry.options.get(CONF_ALARM_ENTITY):
+        alarm_inhibited_sensor = AlarmInhibitedBinarySensor(
+            config_entry,
+            config_entry.entry_id,
+            coordinator,
+        )
+        entities.append(alarm_inhibited_sensor)
 
     # Add diagnostic binary sensors if enabled
     if config_entry.options.get(CONF_ENABLE_DIAGNOSTICS, False):
@@ -104,6 +113,65 @@ class AdaptiveCoverBinarySensor(AdaptiveCoverBaseEntity, BinarySensorEntity):
     def extra_state_attributes(self) -> Mapping[str, Any] | None:  # noqa: D102
         if self._key == "manual_override":
             return {"manual_controlled": self.coordinator.data.states["manual_list"]}
+
+
+class AlarmInhibitedBinarySensor(AdaptiveCoverBaseEntity, BinarySensorEntity):
+    """Binary sensor that is ON whenever cover automation is blocked by the alarm.
+
+    When ON, the integration is not moving any covers because the alarm system
+    is in one of the configured armed states.  This gives the user clear
+    visibility in the HA dashboard about why the shutters are not following
+    the sun.
+    """
+
+    _attr_device_class = BinarySensorDeviceClass.SAFETY
+    _attr_icon = "mdi:shield-lock"
+
+    def __init__(
+        self,
+        config_entry: ConfigEntry,
+        unique_id: str,
+        coordinator: AdaptiveDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the binary sensor."""
+        super().__init__(
+            unique_id,
+            coordinator.hass,
+            config_entry,
+            coordinator,
+        )
+        self._attr_unique_id = f"{unique_id}_alarm_inhibited"
+
+    @property
+    def name(self) -> str:
+        """Name of the entity."""
+        return "Paused by Alarm"
+
+    @property
+    def is_on(self) -> bool:
+        """Return True when cover automation is blocked by the alarm system."""
+        return self.coordinator.data.states.get("alarm_inhibited", False)
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+        """Return the configured alarm entity and active inhibit states."""
+        from .const import CONF_ALARM_INHIBIT_STATES  # avoid circular at module level
+
+        alarm_entity = self.coordinator.config_entry.options.get(CONF_ALARM_ENTITY)
+        inhibit_states = self.coordinator.config_entry.options.get(
+            CONF_ALARM_INHIBIT_STATES, []
+        )
+        current_state = None
+        if alarm_entity:
+            state_obj = self.coordinator.hass.states.get(alarm_entity)
+            if state_obj:
+                current_state = state_obj.state
+
+        return {
+            "alarm_entity": alarm_entity,
+            "alarm_state": current_state,
+            "inhibit_states": inhibit_states,
+        }
 
 
 class AdaptiveCoverPositionMismatchSensor(AdaptiveCoverBaseEntity, BinarySensorEntity):

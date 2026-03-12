@@ -10,6 +10,7 @@ from homeassistant.helpers.event import (
 )
 
 from .const import (
+    CONF_ALARM_ENTITY,
     CONF_END_ENTITY,
     CONF_ENTITIES,
     CONF_FORCE_OVERRIDE_SENSORS,
@@ -48,6 +49,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _end_time_entity = entry.options.get(CONF_END_ENTITY)
     _force_override_sensors = entry.options.get(CONF_FORCE_OVERRIDE_SENSORS, [])
     _motion_sensors = entry.options.get(CONF_MOTION_SENSORS, [])
+    _alarm_entity = entry.options.get(CONF_ALARM_ENTITY)
+
     _entities = ["sun.sun"]
     for entity in [_temp_entity, _presence_entity, _weather_entity, _end_time_entity]:
         if entity is not None:
@@ -56,6 +59,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Add force override sensors to tracked entities
     if _force_override_sensors:
         _entities.extend(_force_override_sensors)
+
+    # Add alarm entity to tracked entities so state changes trigger a coordinator
+    # refresh, which will then check is_alarm_inhibited and skip cover commands.
+    if _alarm_entity:
+        _entities.append(_alarm_entity)
+        _LOGGER.debug(
+            "Alarm inhibit enabled: tracking %s for entry %s",
+            _alarm_entity,
+            entry.data.get("name"),
+        )
 
     _LOGGER.debug("Setting up entry %s", entry.data.get("name"))
 
